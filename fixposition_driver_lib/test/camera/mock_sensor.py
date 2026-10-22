@@ -110,12 +110,19 @@ def serve_client(conn, aus, args, width, height):
                 k += 1
             k += 1
         t0 = time.time()
+        ts0 = time.time_ns() - 20_000_000
         while True:
             is_idr, payload = aus[k % len(aus)]
             k += 1
             if args.skip_seq and sent == args.skip_seq:
-                seq += 3  # simulate lost frames
-            ts = time.time_ns() - 20_000_000  # ~20ms ago (mid exposure)
+                seq += 3  # only the counter jumps
+            if args.lose_after and sent == args.lose_after:
+                k += 1  # a frame that is never sent
+                sent += 1
+                seq += 1
+                is_idr, payload = aus[k % len(aus)]
+                k += 1
+            ts = ts0 + sent * 40_000_000  # exact 25Hz frame times (like the sensor), ~20ms ago (mid exposure)
             meta = ("ts=%d; dt=%d; seq=%d; fmt=%s; frm=%s; width=%d; height=%d; hstride=0; vstride=0; planes=1; "
                     "again=6.02" % (ts, 5174000, seq, fmt, "I_FRAME" if is_idr else "P_FRAME", width, height))
             part = ("--%s\r\nContent-type: %s\r\nX-Fp-Meta: %s\r\nContent-length: %d\r\n\r\n" %
@@ -216,7 +223,8 @@ def main():
     ap.add_argument("--seq0", type=int, default=236159)
     ap.add_argument("--drop-after", type=int, default=0, help="close connection after N frames (every client)")
     ap.add_argument("--start-at-p", action="store_true", help="first frame sent is a P frame")
-    ap.add_argument("--skip-seq", type=int, default=0, help="introduce a seq gap after N frames")
+    ap.add_argument("--skip-seq", type=int, default=0, help="introduce a seq gap (but no missing frame) after N frames")
+    ap.add_argument("--lose-after", type=int, default=0, help="really lose one frame after N frames (seq and time jump)")
     args = ap.parse_args()
 
     frames = aus = None

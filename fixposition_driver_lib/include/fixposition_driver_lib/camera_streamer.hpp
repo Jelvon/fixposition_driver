@@ -64,7 +64,8 @@ struct CameraStats {
     std::atomic<uint64_t> n_connect_{ 0 };     //!< Successful connects
     std::atomic<uint64_t> n_frames_{ 0 };      //!< Frames delivered to the frame observers
     std::atomic<uint64_t> n_dropped_{ 0 };     //!< Frames dropped (while waiting for the first I-frame, invalid frames)
-    std::atomic<uint64_t> n_seq_gaps_{ 0 };    //!< Detected gaps in the frame sequence number (= lost frames)
+    std::atomic<uint64_t> n_lost_{ 0 };        //!< Lost frames, detected from gaps in the frame times
+    std::atomic<uint64_t> n_seq_anomalies_{ 0 }; //!< Discontinuities in the sensor's frame counter (not necessarily lost frames)
     std::atomic<uint64_t> n_images_{ 0 };      //!< Images decoded
     std::atomic<uint64_t> n_decode_fail_{ 0 }; //!< Frames that failed to decode
 };

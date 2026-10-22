@@ -72,10 +72,10 @@ int main(int argc, char** argv) {
     (void)t0;
 
     const auto& st = cs.GetStats();
-    std::printf("RESULT frames=%lu iframes=%lu first_is_I=%d connects=%lu dropped=%lu seq_gaps=%lu mean_latency_ms=%.1f ts_ok=%d "
+    std::printf("RESULT frames=%lu iframes=%lu first_is_I=%d connects=%lu dropped=%lu lost=%lu seq_anomalies=%lu mean_latency_ms=%.1f ts_ok=%d "
                 "stop_ms=%.0f\n",
                 (unsigned long)n, (unsigned long)n_i, first_is_i, (unsigned long)st.n_connect_.load(),
-                (unsigned long)st.n_dropped_.load(), (unsigned long)st.n_seq_gaps_.load(), n ? lat_sum / n : 0.0, ts_ok, stop_ms);
+                (unsigned long)st.n_dropped_.load(), (unsigned long)st.n_lost_.load(), (unsigned long)st.n_seq_anomalies_.load(), n ? lat_sum / n : 0.0, ts_ok, stop_ms);
 #if FPSDK_USE_FFMPEG
     std::printf("RESULT images=%lu decode_fail=%lu size=%dx%d\n", (unsigned long)n_img,
                 (unsigned long)st.n_decode_fail_.load(), w, h);

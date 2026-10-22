@@ -115,6 +115,8 @@ void CameraStreamer::Stream(CamStream& stream) {
     bool seen_iframe = !params_.wait_iframe_;
     bool have_seq = false;
     uint64_t last_seq = 0;
+    uint64_t last_ts = 0;   // [ns] time of the previous frame
+    double interval = 0.0;  // [ns] estimated frame interval
 
 #if FPSDK_USE_FFMPEG
     video::VideoFrameDecoderPtr decoder;
@@ -138,14 +140,28 @@ void CameraStreamer::Stream(CamStream& stream) {
             continue;
         }
 
-        // Lost frames? (seq is the sensor's frame counter)
+        // Lost frames? The frame times (mid-exposure) are the reliable indicator: the frame interval is constant (e.g.
+        // 40ms at 25Hz). The sequence number is only a counter and is not always continuous even if no frames are
+        // missing (seen: a skipped and then a repeated number), so it is only counted.
         if (have_seq && (data.seq_ != (last_seq + 1))) {
-            stats_.n_seq_gaps_++;
-            WARNING("CameraStreamer(%s) frame sequence gap: %" PRIu64 " -> %" PRIu64, params_.name_.c_str(), last_seq,
-                    data.seq_);
+            stats_.n_seq_anomalies_++;
         }
         have_seq = true;
         last_seq = data.seq_;
+        if (data.ts_ != 0) {
+            if (last_ts != 0) {
+                const double step = (data.ts_ > last_ts) ? (double)(data.ts_ - last_ts) : 0.0;
+                if (interval > 0.0 && step > (1.5 * interval)) {
+                    const uint64_t lost = (uint64_t)((step / interval) + 0.5) - 1;
+                    stats_.n_lost_ += lost;
+                    WARNING("CameraStreamer(%s) lost %" PRIu64 " frame(s) (frame time step %.1f ms, expected %.1f ms)",
+                            params_.name_.c_str(), lost, step * 1e-6, interval * 1e-6);
+                } else if (step > 0.0) {
+                    interval = (interval > 0.0) ? ((0.9 * interval) + (0.1 * step)) : step;
+                }
+            }
+            last_ts = data.ts_;
+        }
 
         // A decoder (or a client) can only start at an I-frame
         if (!seen_iframe) {
