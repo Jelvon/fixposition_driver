@@ -30,8 +30,7 @@ using namespace fpsdk::common::cam;
 CameraStreamer::CameraStreamer(const CameraParams& params) /* clang-format off */ :
     params_  { params },
     worker_  { "cam_" + params.name_, std::bind(&CameraStreamer::Worker, this) }  // clang-format on
-{
-}
+{}
 
 CameraStreamer::~CameraStreamer() { StopStreamer(); }
 
@@ -56,9 +55,10 @@ bool CameraStreamer::StartStreamer() {
     }
 #if !FPSDK_USE_FFMPEG
     if (params_.decode_) {
-        WARNING("CameraStreamer(%s) decode requested, but the Fixposition SDK was built without FFmpeg. Only raw "
-                "video frames will be available.",
-                params_.name_.c_str());
+        WARNING(
+            "CameraStreamer(%s) decode requested, but the Fixposition SDK was built without FFmpeg. Only raw "
+            "video frames will be available.",
+            params_.name_.c_str());
     }
 #endif
     return worker_.Start();
@@ -80,9 +80,8 @@ bool CameraStreamer::Worker() {
 
     while (!worker_.ShouldAbort()) {
         // A fresh CamStream for each connection attempt (its HTTP parser state cannot be reused)
-        auto stream = CreateCamStream({ params_.name_, params_.host_, params_.cam_id_, params_.data_type_,
-                                        1 /* rate: must be 1 for _VID */,
-                                        time::Duration::FromSec(params_.timeout_) });
+        auto stream = CreateCamStream({params_.name_, params_.host_, params_.cam_id_, params_.data_type_,
+                                       1 /* rate: must be 1 for _VID */, time::Duration::FromSec(params_.timeout_)});
         if (!stream) {
             ERROR("CameraStreamer(%s) cannot create stream", params_.name_.c_str());
             return false;
@@ -135,8 +134,8 @@ void CameraStreamer::Stream(CamStream& stream) {
         const bool is_h264 = (data.fmt_ == CamDataFmt::H264_NAL);
         if (!data.valid_ || !(is_h265 || is_h264)) {
             stats_.n_dropped_++;
-            WARNING_THR(5000, "CameraStreamer(%s) dropping unsupported frame (valid=%d fmt=%s)",
-                        params_.name_.c_str(), data.valid_, CamDataFmtToStr(data.fmt_));
+            WARNING_THR(5000, "CameraStreamer(%s) dropping unsupported frame (valid=%d fmt=%s)", params_.name_.c_str(),
+                        data.valid_, CamDataFmtToStr(data.fmt_));
             continue;
         }
 
@@ -181,10 +180,10 @@ void CameraStreamer::Stream(CamStream& stream) {
         if (params_.decode_) {
             if (!decoder) {
                 decoder = video::CreateVideoFrameDecoder(
-                    { params_.name_, is_h265 ? video::VideoCodec::H265 : video::VideoCodec::H264,
-                      params_.decode_mono_ ? video::PixelFmt::Y8 : video::PixelFmt::RGB24, params_.decode_scale_,
-                      video::HwAccelFromStrOr(params_.decode_accel_.c_str(), video::HwAccel::AUTO),
-                      video::ScalingQual::BICUBIC });
+                    {params_.name_, is_h265 ? video::VideoCodec::H265 : video::VideoCodec::H264,
+                     params_.decode_mono_ ? video::PixelFmt::Y8 : video::PixelFmt::RGB24, params_.decode_scale_,
+                     video::HwAccelFromStrOr(params_.decode_accel_.c_str(), video::HwAccel::AUTO),
+                     video::ScalingQual::BICUBIC});
                 if (!decoder) {
                     ERROR("CameraStreamer(%s) cannot create decoder", params_.name_.c_str());
                     break;  // bad params, there's no point in retrying quickly

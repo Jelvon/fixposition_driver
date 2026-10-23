@@ -122,8 +122,8 @@ class FixpositionDriverNode {
     rclcpp::Publisher<sensor_msgs::msg::NavSatFix>::SharedPtr datum_pub_;  //!< WGS84 datum topic
 
     // - Camera streaming (one streamer and one or two publishers per camera)
-    std::vector<std::unique_ptr<CameraStreamer>> cameras_;                           //!< Camera streamers
-    std::vector<rclcpp::Publisher<fpmsgs::CamFrame>::SharedPtr> cam_video_pubs_;     //!< Encoded video frames
+    std::vector<std::unique_ptr<CameraStreamer>> cameras_;                               //!< Camera streamers
+    std::vector<rclcpp::Publisher<fpmsgs::CamFrame>::SharedPtr> cam_video_pubs_;         //!< Encoded video frames
     std::vector<rclcpp::Publisher<sensor_msgs::msg::Image>::SharedPtr> cam_image_pubs_;  //!< Decoded images
 
     // ROS subscribers

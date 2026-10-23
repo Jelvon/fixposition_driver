@@ -5,10 +5,10 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <fpsdk_common/time.hpp>
 #include <mutex>
 #include <thread>
 
-#include <fpsdk_common/time.hpp>
 #include "fixposition_driver_lib/camera_streamer.hpp"
 
 using namespace fixposition;
@@ -36,8 +36,9 @@ int main(int argc, char** argv) {
         if (first) {
             first = false;
             first_is_i = (d.frm_ == cam::CamDataFrm::I_FRAME);
-            std::printf("first frame: seq=%lu frm=%s fmt=%s %ux%u dt=%u ns size=%zu\n", d.seq_, cam::CamDataFrmToStr(d.frm_),
-                        cam::CamDataFmtToStr(d.fmt_), d.width_, d.height_, d.dt_, d.data_.size());
+            std::printf("first frame: seq=%lu frm=%s fmt=%s %ux%u dt=%u ns size=%zu\n", d.seq_,
+                        cam::CamDataFrmToStr(d.frm_), cam::CamDataFmtToStr(d.fmt_), d.width_, d.height_, d.dt_,
+                        d.data_.size());
         }
         n++;
         n_i += (d.frm_ == cam::CamDataFrm::I_FRAME);
@@ -68,14 +69,18 @@ int main(int argc, char** argv) {
     std::this_thread::sleep_for(std::chrono::milliseconds((int)(secs * 1000)));
     const auto t_stop0 = std::chrono::steady_clock::now();
     cs.StopStreamer();
-    const double stop_ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t_stop0).count();
+    const double stop_ms =
+        std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t_stop0).count();
     (void)t0;
 
     const auto& st = cs.GetStats();
-    std::printf("RESULT frames=%lu iframes=%lu first_is_I=%d connects=%lu dropped=%lu lost=%lu seq_anomalies=%lu mean_latency_ms=%.1f ts_ok=%d "
-                "stop_ms=%.0f\n",
-                (unsigned long)n, (unsigned long)n_i, first_is_i, (unsigned long)st.n_connect_.load(),
-                (unsigned long)st.n_dropped_.load(), (unsigned long)st.n_lost_.load(), (unsigned long)st.n_seq_anomalies_.load(), n ? lat_sum / n : 0.0, ts_ok, stop_ms);
+    std::printf(
+        "RESULT frames=%lu iframes=%lu first_is_I=%d connects=%lu dropped=%lu lost=%lu seq_anomalies=%lu "
+        "mean_latency_ms=%.1f ts_ok=%d "
+        "stop_ms=%.0f\n",
+        (unsigned long)n, (unsigned long)n_i, first_is_i, (unsigned long)st.n_connect_.load(),
+        (unsigned long)st.n_dropped_.load(), (unsigned long)st.n_lost_.load(),
+        (unsigned long)st.n_seq_anomalies_.load(), n ? lat_sum / n : 0.0, ts_ok, stop_ms);
 #if FPSDK_USE_FFMPEG
     std::printf("RESULT images=%lu decode_fail=%lu size=%dx%d\n", (unsigned long)n_img,
                 (unsigned long)st.n_decode_fail_.load(), w, h);

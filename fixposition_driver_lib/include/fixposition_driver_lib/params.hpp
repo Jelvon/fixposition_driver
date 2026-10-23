@@ -57,15 +57,15 @@ struct DriverParams {
     std::string qos_type_;
 
     // Camera streaming (video from the cameras of a PBx-A1 sensor, via the sensor's HTTP API)
-    bool camera_enabled_ = false;                          //!< Enable camera streaming
-    std::string camera_host_;                              //!< Sensor host for the camera API, empty = host from stream_
-    std::vector<std::string> camera_cams_ = { "CAM1" };    //!< Cameras to stream (CAM1, CAM2, ...)
-    std::string camera_data_ = "HIRES_VID";                //!< Which stream (HIRES_VID or LORES_VID)
-    bool camera_raw_output_ = true;                        //!< Publish the encoded video frames
-    bool camera_decode_ = false;                           //!< Publish decoded images (needs FFmpeg in the SDK)
-    bool camera_decode_mono_ = false;                      //!< Decode to greyscale instead of RGB
-    double camera_decode_scale_ = 1.0;                     //!< Scale factor for decoded images (0.1 - 1.0)
-    std::string camera_decode_accel_ = "auto";             //!< Decoder hw acceleration: "auto", "sw", "hw"
+    bool camera_enabled_ = false;                      //!< Enable camera streaming
+    std::string camera_host_;                          //!< Sensor host for the camera API, empty = host from stream_
+    std::vector<std::string> camera_cams_ = {"CAM1"};  //!< Cameras to stream (CAM1, CAM2, ...)
+    std::string camera_data_ = "HIRES_VID";            //!< Which stream (HIRES_VID or LORES_VID)
+    bool camera_raw_output_ = true;                    //!< Publish the encoded video frames
+    bool camera_decode_ = false;                       //!< Publish decoded images (needs FFmpeg in the SDK)
+    bool camera_decode_mono_ = false;                  //!< Decode to greyscale instead of RGB
+    double camera_decode_scale_ = 1.0;                 //!< Scale factor for decoded images (0.1 - 1.0)
+    std::string camera_decode_accel_ = "auto";         //!< Decoder hw acceleration: "auto", "sw", "hw"
 
     // Check if entry is in messges_
     bool MessageEnabled(const std::string& message_name) const;

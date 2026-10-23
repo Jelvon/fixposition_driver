@@ -41,19 +41,19 @@ namespace fixposition {
  * @brief Parameters for one camera stream
  */
 struct CameraParams {
-    std::string name_ = "cam1";                                      //!< Name (for logging, and topic names)
-    std::string host_ = "10.0.2.1";                                  //!< Sensor host name or IP address
+    std::string name_ = "cam1";                                           //!< Name (for logging, and topic names)
+    std::string host_ = "10.0.2.1";                                       //!< Sensor host name or IP address
     fpsdk::common::cam::CamId cam_id_ = fpsdk::common::cam::CamId::CAM1;  //!< Which camera
     //! Which stream. Only the video streams (HIRES_VID, LORES_VID) are supported by this class.
     fpsdk::common::cam::CamDataType data_type_ = fpsdk::common::cam::CamDataType::HIRES_VID;
     double reconnect_delay_ = 5.0;  //!< Wait time [s] before reconnecting after the connection was lost
-    double timeout_ = 1.0;          //!< Timeout [s] for receiving data, must be >= 0.1. Also limits StopStreamer() latency
-    bool wait_iframe_ = true;       //!< Drop all frames until the first I-frame (after each (re-)connect)
+    double timeout_ = 1.0;     //!< Timeout [s] for receiving data, must be >= 0.1. Also limits StopStreamer() latency
+    bool wait_iframe_ = true;  //!< Drop all frames until the first I-frame (after each (re-)connect)
 
     // Decoding (only effective if the Fixposition SDK was built with FFmpeg, see FPSDK_USE_FFMPEG)
-    bool decode_ = false;           //!< Decode the video frames and notify image observers
-    bool decode_mono_ = false;      //!< Decode to greyscale (Y8) instead of RGB (RGB24). Cheaper.
-    double decode_scale_ = 1.0;     //!< Scale factor for the decoded image, 0.1-1.0
+    bool decode_ = false;                //!< Decode the video frames and notify image observers
+    bool decode_mono_ = false;           //!< Decode to greyscale (Y8) instead of RGB (RGB24). Cheaper.
+    double decode_scale_ = 1.0;          //!< Scale factor for the decoded image, 0.1-1.0
     std::string decode_accel_ = "auto";  //!< Hw acceleration "auto", "sw" or "hw"
 };
 
@@ -61,13 +61,14 @@ struct CameraParams {
  * @brief Counters, for diagnostics
  */
 struct CameraStats {
-    std::atomic<uint64_t> n_connect_{ 0 };     //!< Successful connects
-    std::atomic<uint64_t> n_frames_{ 0 };      //!< Frames delivered to the frame observers
-    std::atomic<uint64_t> n_dropped_{ 0 };     //!< Frames dropped (while waiting for the first I-frame, invalid frames)
-    std::atomic<uint64_t> n_lost_{ 0 };        //!< Lost frames, detected from gaps in the frame times
-    std::atomic<uint64_t> n_seq_anomalies_{ 0 }; //!< Discontinuities in the sensor's frame counter (not necessarily lost frames)
-    std::atomic<uint64_t> n_images_{ 0 };      //!< Images decoded
-    std::atomic<uint64_t> n_decode_fail_{ 0 }; //!< Frames that failed to decode
+    std::atomic<uint64_t> n_connect_{0};  //!< Successful connects
+    std::atomic<uint64_t> n_frames_{0};   //!< Frames delivered to the frame observers
+    std::atomic<uint64_t> n_dropped_{0};  //!< Frames dropped (while waiting for the first I-frame, invalid frames)
+    std::atomic<uint64_t> n_lost_{0};     //!< Lost frames, detected from gaps in the frame times
+    std::atomic<uint64_t> n_seq_anomalies_{
+        0};  //!< Discontinuities in the sensor's frame counter (not necessarily lost frames)
+    std::atomic<uint64_t> n_images_{0};       //!< Images decoded
+    std::atomic<uint64_t> n_decode_fail_{0};  //!< Frames that failed to decode
 };
 
 /**
