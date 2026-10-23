@@ -17,8 +17,10 @@
 /* LIBC/STL */
 #include <memory>
 #include <mutex>
+#include <vector>
 
 /* EXTERNAL */
+#include <fixposition_driver_lib/camera_streamer.hpp>
 #include <fixposition_driver_lib/helper.hpp>
 
 #include "fixposition_driver_ros2/ext/rclcpp.hpp"
@@ -118,6 +120,11 @@ class FixpositionDriverNode {
     rclcpp::Publisher<fpmsgs::CovWarn>::SharedPtr jump_pub_;               //!< Jump warning topic
     rclcpp::Publisher<fpmsgs::ParserMsg>::SharedPtr raw_pub_;              //!< Raw messages topic
     rclcpp::Publisher<sensor_msgs::msg::NavSatFix>::SharedPtr datum_pub_;  //!< WGS84 datum topic
+
+    // - Camera streaming (one streamer and one or two publishers per camera)
+    std::vector<std::unique_ptr<CameraStreamer>> cameras_;                               //!< Camera streamers
+    std::vector<rclcpp::Publisher<fpmsgs::CamFrame>::SharedPtr> cam_video_pubs_;         //!< Encoded video frames
+    std::vector<rclcpp::Publisher<sensor_msgs::msg::Image>::SharedPtr> cam_image_pubs_;  //!< Decoded images
 
     // ROS subscribers
     rclcpp::Subscription<fpmsgs::Speed>::SharedPtr ws_sub_;              //!< Wheelspeed input subscriber

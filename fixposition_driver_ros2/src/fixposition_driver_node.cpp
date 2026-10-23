@@ -22,13 +22,16 @@
 
 /* EXTERNAL */
 #include <fpsdk_common/app.hpp>
+#include <fpsdk_common/cam.hpp>
 #include <fpsdk_common/logging.hpp>
 #include <fpsdk_common/parser/fpa.hpp>
 #include <fpsdk_common/parser/nmea.hpp>
 #include <fpsdk_common/parser/novb.hpp>
 #include <fpsdk_common/ros2.hpp>
+#include <fpsdk_common/string.hpp>
 #include <fpsdk_common/trafo.hpp>
 #include <fpsdk_common/types.hpp>
+#include <fpsdk_common/video.hpp>
 
 /* PACKAGE */
 #include "fixposition_driver_ros2/fixposition_driver_node.hpp"
@@ -478,6 +481,70 @@ bool FixpositionDriverNode::StartNode() {
         }
     }
 
+    // Camera streaming (video from the PBx-A1 cameras via the sensor's HTTP API, separate from the message stream)
+    if (params_.camera_enabled_) {
+        const std::string host = params_.CameraHost();
+        if (host.empty()) {
+            RCLCPP_ERROR(logger_, "Camera streaming: no host (set camera.host, or use a tcpcli:// stream)");
+            return false;
+        }
+        const auto data_type = cam::CamDataTypeFromStrOr(params_.camera_data_.c_str(), cam::CamDataType::UNSPECIFIED);
+        if (params_.camera_cams_.empty()) {
+            RCLCPP_ERROR(logger_, "Camera streaming: camera.cams is empty");
+            return false;
+        }
+        for (const auto& cam_name : params_.camera_cams_) {
+            const auto cam_id = cam::CamIdFromStrOr(cam_name.c_str(), cam::CamId::UNSPECIFIED);
+            if (cam_id == cam::CamId::UNSPECIFIED) {
+                RCLCPP_ERROR(logger_, "Camera streaming: bad camera '%s'", cam_name.c_str());
+                return false;
+            }
+            const std::string lname = fpsdk::common::string::StrToLower(cam_name);  // "cam1"
+
+            CameraParams cam_params;
+            cam_params.name_ = lname;
+            cam_params.host_ = host;
+            cam_params.cam_id_ = cam_id;
+            cam_params.data_type_ = data_type;
+            cam_params.reconnect_delay_ = params_.reconnect_delay_;
+            cam_params.decode_ = params_.camera_decode_;
+            cam_params.decode_mono_ = params_.camera_decode_mono_;
+            cam_params.decode_scale_ = params_.camera_decode_scale_;
+            cam_params.decode_accel_ = params_.camera_decode_accel_;
+            auto streamer = std::make_unique<CameraStreamer>(cam_params);
+
+            // Encoded video frames. The video must not lose frames, so this is reliable.
+            if (params_.camera_raw_output_) {
+                rclcpp::Publisher<fpmsgs::CamFrame>::SharedPtr pub;
+                _PUB(pub, fpmsgs::CamFrame, output_ns + "/" + lname + "/video",
+                     rclcpp::QoS(rclcpp::KeepLast(50)).reliable());
+                cam_video_pubs_.push_back(pub);
+                streamer->AddFrameObserver(
+                    [pub, lname](const cam::CamData& data) { PublishCamFrame(data, lname, pub); });
+            }
+
+            // Decoded images
+            if (params_.camera_decode_) {
+#if FPSDK_USE_FFMPEG
+                rclcpp::Publisher<sensor_msgs::msg::Image>::SharedPtr pub;
+                _PUB(pub, sensor_msgs::msg::Image, output_ns + "/" + lname + "/image_raw", qos_settings_);
+                cam_image_pubs_.push_back(pub);
+                streamer->AddImageObserver([pub, lname](const cam::CamData& data, const video::ImageData& img) {
+                    PublishCamImage(data, img, lname, pub);
+                });
+#else
+                RCLCPP_WARN(logger_, "Camera streaming: camera.decode requires the Fixposition SDK built with FFmpeg");
+#endif
+            }
+
+            if (!streamer->StartStreamer()) {
+                RCLCPP_ERROR(logger_, "Camera streaming: failed starting %s", lname.c_str());
+                return false;
+            }
+            cameras_.push_back(std::move(streamer));
+        }
+    }
+
     return driver_.StartDriver();
 }
 
@@ -486,6 +553,14 @@ bool FixpositionDriverNode::StartNode() {
 
 void FixpositionDriverNode::StopNode() {
     RCLCPP_INFO(logger_, "Stopping...");
+
+    // Camera streaming. The streamers must be stopped first (their observers use the publishers).
+    for (auto& streamer : cameras_) {
+        streamer->StopStreamer();
+    }
+    cameras_.clear();
+    cam_video_pubs_.clear();
+    cam_image_pubs_.clear();
 
     driver_.RemoveFpaObservers();
     driver_.RemoveNmeaObservers();

@@ -40,6 +40,7 @@ include_directories(include
 
 add_library(
   ${PROJECT_NAME} SHARED
+  src/camera_streamer.cpp
   src/fixposition_driver.cpp
   src/helper.cpp
   src/params.cpp
