@@ -14,7 +14,7 @@ patched SDK.
     ./mock_sensor.py --file test.h265 --codec h265 --port 80 [--drop-after N] [--start-at-p]
 
 Replay of a real recording (.fpl from a PBx-A1): extract the camera data with the Fixposition SDK's fpltool and replay the
-frames with their real meta data (seq, ts deltas, dt, frm, size) and real timing, looping at the end:
+frames with their real meta data (seq, frame times, dt, frm, size) and real timing, looping at the end:
 
     fpltool extract -e jsonl some.fpl          # writes some.jsonl (all streams, includes the CAMDATA records)
     ./mock_sensor.py --jsonl some.jsonl --cam CAM1 --data HIRES_VID --port 80
@@ -183,13 +183,14 @@ def serve_client_jsonl(conn, frames, args):
             k += 1
         t0 = time.time()
         ts_first = frames[k % n]["ts"] + (k // n) * span_ts
+        ts_base = time.time_ns() - 20_000_000
         sent = 0
         while True:
             fr = frames[k % n]
             loop = k // n
             ts_orig = fr["ts"] + loop * span_ts
             seq = fr["seq"] + loop * span_seq
-            ts = time.time_ns() - 20_000_000
+            ts = ts_base + (ts_orig - ts_first)  # the recorded frame times, shifted to "now"
             ctype = "video/hevc" if fr["fmt"] == "H265_NAL" else "video/avc"
             meta = ("ts=%d; dt=%d; seq=%d; fmt=%s; frm=%s; width=%d; height=%d; hstride=0; vstride=0; planes=1" %
                     (ts, fr["dt"], seq, fr["fmt"], fr["frm"], fr["width"], fr["height"]))
