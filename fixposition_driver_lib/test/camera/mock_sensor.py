@@ -214,6 +214,9 @@ def serve_client_jsonl(conn, frames, args):
         conn.close()
 
 
+hung = []
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--file", help="raw Annex-B H.265/H.264 file")
@@ -231,6 +234,7 @@ def main():
     ap.add_argument("--skip-seq", type=int, default=0, help="introduce a seq gap (but no missing frame) after N frames")
     ap.add_argument("--stall-after", type=int, default=0, help="stop sending after N frames but keep the connection open")
     ap.add_argument("--stall-secs", type=float, default=3600.0)
+    ap.add_argument("--no-response", type=int, default=0, help="accept the first N connections but never respond")
     ap.add_argument("--lose-after", type=int, default=0, help="really lose one frame after N frames (seq and time jump)")
     args = ap.parse_args()
 
@@ -252,8 +256,14 @@ def main():
     srv.bind((args.bind, args.port))
     srv.listen(5)
     print("listening on %s:%d" % (args.bind, args.port), flush=True)
+    n_clients = 0
     while True:
         conn, _ = srv.accept()
+        n_clients += 1
+        if n_clients <= args.no_response:
+            print("client %d: accepting, but never responding" % n_clients, flush=True)
+            hung.append(conn)  # keep it open
+            continue
         if frames:
             threading.Thread(target=serve_client_jsonl, args=(conn, frames, args), daemon=True).start()
         else:

@@ -15,6 +15,7 @@
 #include <atomic>
 #include <chrono>
 #include <cinttypes>
+#include <functional>
 #include <thread>
 
 /* EXTERNAL */
@@ -75,6 +76,59 @@ void CameraStreamer::StopStreamer() {
 
 // ---------------------------------------------------------------------------------------------------------------------
 
+namespace {
+/**
+ * @brief Closes a CamStream that does not make progress
+ *
+ * CamStream reads and connects synchronously, and its timeout does not apply to that. So a connection that stays open
+ * without data (cable unplugged, sensor busy or frozen) blocks Connect() resp. NextFrame() forever, and so would
+ * StopStreamer(). This watchdog thread closes the connection (which unblocks the blocking call) if Feed() was not
+ * called for longer than the timeout, or as soon as the streamer is to be stopped.
+ */
+class StreamWatchdog {
+   public:
+    using Clock = std::chrono::steady_clock;
+    StreamWatchdog(CamStream& stream, const double timeout, std::function<bool()> should_abort)
+        : stream_{stream},
+          timeout_{std::chrono::duration_cast<Clock::duration>(std::chrono::duration<double>(timeout))},
+          should_abort_{should_abort},
+          thread_{&StreamWatchdog::Run, this} {}
+    ~StreamWatchdog() { Stop(); }
+    void Feed() { last_ = Clock::now().time_since_epoch().count(); }
+    void Stop() {
+        finished_ = true;
+        if (thread_.joinable()) {
+            thread_.join();
+        }
+    }
+    bool Closed() const { return closed_; }         //!< The watchdog closed the connection
+    bool TimedOut() const { return timeout_hit_; }  //!< ... because of a timeout (not because of a stop request)
+
+   private:
+    void Run() {
+        while (!finished_) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(50));
+            const auto idle = Clock::now() - Clock::time_point(Clock::duration(last_.load()));
+            const bool abort = should_abort_();
+            if (!finished_ && (abort || (idle > timeout_))) {
+                timeout_hit_ = !abort;
+                closed_ = true;
+                stream_.Disconnect();
+                return;
+            }
+        }
+    }
+    CamStream& stream_;
+    Clock::duration timeout_;
+    std::function<bool()> should_abort_;
+    std::atomic<int64_t> last_{Clock::now().time_since_epoch().count()};
+    std::atomic<bool> finished_{false};
+    std::atomic<bool> closed_{false};
+    std::atomic<bool> timeout_hit_{false};
+    std::thread thread_;  // last: started after all other members are initialised
+};
+}  // namespace
+
 bool CameraStreamer::Worker() {
     INFO("CameraStreamer(%s) running (%s %s %s)", params_.name_.c_str(), params_.host_.c_str(),
          CamIdToStr(params_.cam_id_), CamDataTypeToStr(params_.data_type_));
@@ -90,10 +144,20 @@ bool CameraStreamer::Worker() {
             return false;
         }
 
-        if (stream->Connect()) {
-            stats_.n_connect_++;
-            INFO("CameraStreamer(%s) connected", params_.name_.c_str());
-            if (!Stream(*stream)) {
+        {
+            StreamWatchdog watchdog(*stream, params_.timeout_, [this]() { return worker_.ShouldAbort(); });
+            bool connected = false;
+            if (stream->Connect()) {
+                connected = true;
+                stats_.n_connect_++;
+                INFO("CameraStreamer(%s) connected", params_.name_.c_str());
+                Stream(*stream, [&watchdog]() { watchdog.Feed(); });
+            }
+            watchdog.Stop();
+            if (watchdog.TimedOut()) {
+                WARNING("CameraStreamer(%s) %s for %.1f seconds, closed connection", params_.name_.c_str(),
+                        connected ? "no data" : "no response", params_.timeout_);
+            } else if (connected && !watchdog.Closed()) {
                 stream->Disconnect();
             }
         }
@@ -114,30 +178,7 @@ bool CameraStreamer::Worker() {
 
 // ---------------------------------------------------------------------------------------------------------------------
 
-bool CameraStreamer::Stream(CamStream& stream) {
-    // The read timeout of CamStream does not work (the SDK reads synchronously), so a stalled connection (e.g. cable
-    // unplugged, sensor frozen) would block NextFrame() forever, and so StopStreamer(). A watchdog thread closes the
-    // connection (which unblocks NextFrame()) if there is no data for a while, or if the streamer is to be stopped.
-    using Clock = std::chrono::steady_clock;
-    std::atomic<int64_t> last_data{Clock::now().time_since_epoch().count()};
-    std::atomic<bool> finished{false};
-    std::atomic<bool> stalled{false};
-    bool disconnected = false;
-    const auto stall_timeout =
-        std::chrono::duration_cast<Clock::duration>(std::chrono::duration<double>(params_.timeout_));
-    std::thread watchdog([&]() {
-        while (!finished) {
-            std::this_thread::sleep_for(std::chrono::milliseconds(50));
-            const auto idle = Clock::now() - Clock::time_point(Clock::duration(last_data.load()));
-            if (!finished && (worker_.ShouldAbort() || (idle > stall_timeout))) {
-                stalled = !worker_.ShouldAbort();
-                stream.Disconnect();
-                disconnected = true;
-                return;
-            }
-        }
-    });
-
+void CameraStreamer::Stream(CamStream& stream, const std::function<void()>& feed) {
     bool seen_iframe = !params_.wait_iframe_;
     bool have_seq = false;
     uint64_t last_seq = 0;
@@ -152,7 +193,7 @@ bool CameraStreamer::Stream(CamStream& stream) {
         // Fresh object for each frame: CamStream::NextFrame() only overwrites the fields it finds in the meta data,
         // anything else (e.g. valid_, frm_) would be left over from the previous frame.
         CamData data;
-        last_data = Clock::now().time_since_epoch().count();  // the watchdog measures the time in NextFrame()
+        feed();  // the watchdog measures the time spent in NextFrame()
         if (!stream.NextFrame(data)) {
             break;  // lost connection, bad data, stalled (closed by the watchdog)
         }
@@ -235,14 +276,6 @@ bool CameraStreamer::Stream(CamStream& stream) {
         }
 #endif
     }
-
-    finished = true;
-    watchdog.join();
-    if (stalled) {
-        WARNING("CameraStreamer(%s) no data for %.1f seconds, closing connection", params_.name_.c_str(),
-                params_.timeout_);
-    }
-    return disconnected;
 }
 
 /* ****************************************************************************************************************** */
