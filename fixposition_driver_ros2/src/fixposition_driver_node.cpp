@@ -489,10 +489,16 @@ bool FixpositionDriverNode::StartNode() {
             return false;
         }
         const auto data_type = cam::CamDataTypeFromStrOr(params_.camera_data_.c_str(), cam::CamDataType::UNSPECIFIED);
+        if (data_type == cam::CamDataType::UNSPECIFIED) {
+            RCLCPP_ERROR(logger_, "Camera streaming: bad camera.data '%s'", params_.camera_data_.c_str());
+            return false;
+        }
         if (params_.camera_cams_.empty()) {
             RCLCPP_ERROR(logger_, "Camera streaming: camera.cams is empty");
             return false;
         }
+        RCLCPP_INFO(logger_, "Camera streaming: %s from %s, cameras: %s", params_.camera_data_.c_str(), host.c_str(),
+                    fpsdk::common::string::StrJoin(params_.camera_cams_, ", ").c_str());
         for (const auto& cam_name : params_.camera_cams_) {
             const auto cam_id = cam::CamIdFromStrOr(cam_name.c_str(), cam::CamId::UNSPECIFIED);
             if (cam_id == cam::CamId::UNSPECIFIED) {
@@ -541,6 +547,18 @@ bool FixpositionDriverNode::StartNode() {
                 RCLCPP_ERROR(logger_, "Camera streaming: failed starting %s", lname.c_str());
                 return false;
             }
+            std::vector<std::string> topics;
+            if (params_.camera_raw_output_) {
+                topics.push_back(output_ns + "/" + lname + "/video");
+            }
+#if FPSDK_USE_FFMPEG
+            if (params_.camera_decode_) {
+                topics.push_back(output_ns + "/" + lname + "/image_raw");
+            }
+#endif
+            RCLCPP_INFO(logger_, "Camera streaming: %s -> %s", cam_name.c_str(),
+                        topics.empty() ? "(no output, enable camera.raw_output or camera.decode)"
+                                       : fpsdk::common::string::StrJoin(topics, ", ").c_str());
             cameras_.push_back(std::move(streamer));
         }
     }
