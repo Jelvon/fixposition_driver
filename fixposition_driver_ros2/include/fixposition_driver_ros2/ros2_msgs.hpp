@@ -10,6 +10,7 @@
 #include <geometry_msgs/msg/transform_stamped.hpp>
 #include <geometry_msgs/msg/vector3_stamped.hpp>
 #include <nav_msgs/msg/odometry.hpp>
+#include <sensor_msgs/msg/image.hpp>
 #include <sensor_msgs/msg/imu.hpp>
 #include <sensor_msgs/msg/nav_sat_fix.hpp>
 #include <std_msgs/msg/u_int8_multi_array.hpp>
@@ -25,6 +26,7 @@
 
 // Fixposition ROS messages
 // - Generic
+#include <fixposition_driver_msgs/msg/cam_frame.hpp>
 #include <fixposition_driver_msgs/msg/fusion_epoch.hpp>
 #include <fixposition_driver_msgs/msg/nmea_epoch.hpp>
 #include <fixposition_driver_msgs/msg/parser_msg.hpp>

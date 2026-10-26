@@ -65,6 +65,19 @@
             use_y: false               # Transmit the y axis of the input velocity
             use_z: false               # Transmit the z axis of the input velocity
 
+        # Camera streaming from a PBx-A1 sensor (video from the cameras, via the sensor's HTTP API on port 80, separate
+        # from the "stream" above). Disabled by default. Only one stream per camera at any time. Use Ethernet, not Wi-Fi.
+        camera:
+            enabled:      false         # Enable camera streaming
+            host:         ""            # Sensor hostname or IP address, "" = use host of the tcpcli:// "stream" above
+            cams:         ["CAM1"]      # Cameras to stream: CAM1, CAM2, CAM3, CAM4
+            data:         "HIRES_VID"   # Stream: "HIRES_VID" (H.265) or "LORES_VID"
+            raw_output:   true          # Publish the encoded video frames (<output_ns>/cam1/video, CamFrame)
+            decode:       false         # Publish decoded images (<output_ns>/cam1/image_raw), needs the SDK built with FFmpeg
+            decode_mono:  false         # Decode to greyscale (mono8) instead of RGB (rgb8)
+            decode_scale: 1.0           # Scale factor for the decoded images (0.1 - 1.0)
+            decode_accel: "auto"        # Decoder hw acceleration: "auto", "sw" or "hw" (VA-API)
+
         # Node parameters
         output_ns:   "/fixposition"              # Namespace for output topics, leave empty to use node namespace
         speed_topic: "/fixposition/speed"        # Wheelspeed input, empty to disable

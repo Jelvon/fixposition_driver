@@ -15,6 +15,7 @@
 
 /* EXTERNAL */
 #include <fixposition_driver_msgs/data_to_ros.hpp>
+#include <fpsdk_common/logging.hpp>
 #include <fpsdk_common/math.hpp>
 #include <fpsdk_common/ros2.hpp>
 #include <fpsdk_common/time.hpp>
@@ -940,5 +941,59 @@ void PublishFusionEpochData(const FusionEpochData& data, rclcpp::Publisher<fpmsg
         pub->publish(msg);
     }
 }
+// ---------------------------------------------------------------------------------------------------------------------
+
+// Camera image time (middle of exposure) as ROS time. The sensor stamps frames with CLOCK_REALTIME [ns] (POSIX).
+static rclcpp::Time CamDataStamp(const cam::CamData& data) {
+    if (data.ts_ == 0) {
+        WARNING_THR(5000, "Camera frame without timestamp, using the current time (sensor time not synced?)");
+        return ros2::ConvTime(time::Time::FromClockRealtime());
+    }
+    return ros2::ConvTime(time::Time::FromPosixNs(data.ts_));
+}
+
+void PublishCamFrame(const cam::CamData& data, const std::string& frame_id,
+                     const rclcpp::Publisher<fpmsgs::CamFrame>::SharedPtr& pub) {
+    if (!pub) {
+        return;
+    }
+    auto msg = std::make_unique<fpmsgs::CamFrame>();
+    msg->header.stamp = CamDataStamp(data);
+    msg->header.frame_id = frame_id;
+    msg->cam_id = static_cast<uint8_t>(data.cam_id_);
+    msg->data_type = cam::CamDataTypeToStr(data.type_);
+    msg->format = cam::CamDataFmtToStr(data.fmt_);
+    msg->keyframe = (data.frm_ == cam::CamDataFrm::I_FRAME);
+    msg->seq = data.seq_;
+    msg->width = data.width_;
+    msg->height = data.height_;
+    msg->exposure = static_cast<double>(data.dt_) * 1e-9;
+    msg->data = data.data_;
+    pub->publish(std::move(msg));
+}
+
+#if FPSDK_USE_FFMPEG
+void PublishCamImage(const cam::CamData& data, const video::ImageData& img, const std::string& frame_id,
+                     const rclcpp::Publisher<sensor_msgs::msg::Image>::SharedPtr& pub) {
+    if (!pub) {
+        return;
+    }
+    const bool mono = (img.fmt_ == video::PixelFmt::Y8);
+    if (!mono && (img.fmt_ != video::PixelFmt::RGB24)) {
+        return;  // not supported, should not happen
+    }
+    auto msg = std::make_unique<sensor_msgs::msg::Image>();
+    msg->header.stamp = CamDataStamp(data);
+    msg->header.frame_id = frame_id;
+    msg->height = static_cast<uint32_t>(img.height_);
+    msg->width = static_cast<uint32_t>(img.width_);
+    msg->encoding = mono ? "mono8" : "rgb8";
+    msg->is_bigendian = 0;
+    msg->step = static_cast<uint32_t>(img.width_) * (mono ? 1 : 3);
+    msg->data = img.data_;
+    pub->publish(std::move(msg));
+}
+#endif
+
 /* ****************************************************************************************************************** */
 }  // namespace fixposition

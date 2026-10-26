@@ -47,6 +47,15 @@ bool LoadParamsFromRos2(std::shared_ptr<rclcpp::Node>& nh, DriverParams& params)
     const std::string SPEED_TOPIC = "speed_topic";
     const std::string CORR_TOPIC = "corr_topic";
     const std::string QOS_TYPE = "qos_type";
+    const std::string CAMERA_ENABLED = "camera.enabled";
+    const std::string CAMERA_HOST = "camera.host";
+    const std::string CAMERA_CAMS = "camera.cams";
+    const std::string CAMERA_DATA = "camera.data";
+    const std::string CAMERA_RAW_OUTPUT = "camera.raw_output";
+    const std::string CAMERA_DECODE = "camera.decode";
+    const std::string CAMERA_DECODE_MONO = "camera.decode_mono";
+    const std::string CAMERA_DECODE_SCALE = "camera.decode_scale";
+    const std::string CAMERA_DECODE_ACCEL = "camera.decode_accel";
 
     std::string topic_type_string_;
     nh->declare_parameter(STREAM, params.stream_);
@@ -69,6 +78,15 @@ bool LoadParamsFromRos2(std::shared_ptr<rclcpp::Node>& nh, DriverParams& params)
     nh->declare_parameter(SPEED_TOPIC, params.speed_topic_);
     nh->declare_parameter(CORR_TOPIC, params.corr_topic_);
     nh->declare_parameter(QOS_TYPE, params.qos_type_);
+    nh->declare_parameter(CAMERA_ENABLED, params.camera_enabled_);
+    nh->declare_parameter(CAMERA_HOST, params.camera_host_);
+    nh->declare_parameter(CAMERA_CAMS, params.camera_cams_);
+    nh->declare_parameter(CAMERA_DATA, params.camera_data_);
+    nh->declare_parameter(CAMERA_RAW_OUTPUT, params.camera_raw_output_);
+    nh->declare_parameter(CAMERA_DECODE, params.camera_decode_);
+    nh->declare_parameter(CAMERA_DECODE_MONO, params.camera_decode_mono_);
+    nh->declare_parameter(CAMERA_DECODE_SCALE, params.camera_decode_scale_);
+    nh->declare_parameter(CAMERA_DECODE_ACCEL, params.camera_decode_accel_);
 
     if (!nh->get_parameter(STREAM, params.stream_) || params.stream_.empty()) {
         RCLCPP_WARN(logger, "Failed loading %s param", STREAM.c_str());
@@ -166,6 +184,45 @@ bool LoadParamsFromRos2(std::shared_ptr<rclcpp::Node>& nh, DriverParams& params)
         RCLCPP_WARN(logger, "Failed loading %s param", QOS_TYPE.c_str());
         ok = false;
     }
+    if (!nh->get_parameter(CAMERA_ENABLED, params.camera_enabled_)) {
+        RCLCPP_WARN(logger, "Failed loading %s param", CAMERA_ENABLED.c_str());
+        ok = false;
+    }
+    if (!nh->get_parameter(CAMERA_HOST, params.camera_host_)) {
+        RCLCPP_WARN(logger, "Failed loading %s param", CAMERA_HOST.c_str());
+        ok = false;
+    }
+    if (!nh->get_parameter(CAMERA_CAMS, params.camera_cams_)) {
+        RCLCPP_WARN(logger, "Failed loading %s param", CAMERA_CAMS.c_str());
+        ok = false;
+    }
+    if (!nh->get_parameter(CAMERA_DATA, params.camera_data_)) {
+        RCLCPP_WARN(logger, "Failed loading %s param", CAMERA_DATA.c_str());
+        ok = false;
+    }
+    if (!nh->get_parameter(CAMERA_RAW_OUTPUT, params.camera_raw_output_)) {
+        RCLCPP_WARN(logger, "Failed loading %s param", CAMERA_RAW_OUTPUT.c_str());
+        ok = false;
+    }
+    if (!nh->get_parameter(CAMERA_DECODE, params.camera_decode_)) {
+        RCLCPP_WARN(logger, "Failed loading %s param", CAMERA_DECODE.c_str());
+        ok = false;
+    }
+    if (!nh->get_parameter(CAMERA_DECODE_MONO, params.camera_decode_mono_)) {
+        RCLCPP_WARN(logger, "Failed loading %s param", CAMERA_DECODE_MONO.c_str());
+        ok = false;
+    }
+    if (!nh->get_parameter(CAMERA_DECODE_SCALE, params.camera_decode_scale_) || (params.camera_decode_scale_ < 0.1) ||
+        (params.camera_decode_scale_ > 1.0)) {
+        RCLCPP_WARN(logger, "Failed loading %s param (must be 0.1 - 1.0)", CAMERA_DECODE_SCALE.c_str());
+        ok = false;
+    }
+    if (!nh->get_parameter(CAMERA_DECODE_ACCEL, params.camera_decode_accel_) ||
+        ((params.camera_decode_accel_ != "auto") && (params.camera_decode_accel_ != "sw") &&
+         (params.camera_decode_accel_ != "hw"))) {
+        RCLCPP_WARN(logger, "Failed loading %s param (must be auto, sw or hw)", CAMERA_DECODE_ACCEL.c_str());
+        ok = false;
+    }
 
     RCLCPP_INFO(logger, "DriverParams: stream=%s", params.stream_.c_str());
     RCLCPP_INFO(logger, "DriverParams: reconnect_delay=%.1f", params.reconnect_delay_);
@@ -189,6 +246,19 @@ bool LoadParamsFromRos2(std::shared_ptr<rclcpp::Node>& nh, DriverParams& params)
     RCLCPP_INFO(logger, "DriverParams: speed_topic=%s", params.speed_topic_.c_str());
     RCLCPP_INFO(logger, "DriverParams: corr_topic=%s", params.corr_topic_.c_str());
     RCLCPP_INFO(logger, "DriverParams: qos_type=%s", params.qos_type_.c_str());
+    RCLCPP_INFO(logger, "DriverParams: camera.enabled=%s", params.camera_enabled_ ? "true" : "false");
+    if (params.camera_enabled_) {
+        RCLCPP_INFO(logger, "DriverParams: camera.host=%s", params.CameraHost().c_str());
+        for (std::size_t ix = 0; ix < params.camera_cams_.size(); ix++) {
+            RCLCPP_INFO(logger, "DriverParams: camera.cams[%" PRIuMAX "]=%s", ix, params.camera_cams_[ix].c_str());
+        }
+        RCLCPP_INFO(logger, "DriverParams: camera.data=%s", params.camera_data_.c_str());
+        RCLCPP_INFO(logger, "DriverParams: camera.raw_output=%s", params.camera_raw_output_ ? "true" : "false");
+        RCLCPP_INFO(logger, "DriverParams: camera.decode=%s", params.camera_decode_ ? "true" : "false");
+        RCLCPP_INFO(logger, "DriverParams: camera.decode_mono=%s", params.camera_decode_mono_ ? "true" : "false");
+        RCLCPP_INFO(logger, "DriverParams: camera.decode_scale=%.2f", params.camera_decode_scale_);
+        RCLCPP_INFO(logger, "DriverParams: camera.decode_accel=%s", params.camera_decode_accel_.c_str());
+    }
 
     return ok;
 }

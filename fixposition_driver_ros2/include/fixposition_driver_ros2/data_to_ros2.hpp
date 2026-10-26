@@ -21,8 +21,10 @@
 /* EXTERNAL */
 #include <fixposition_driver_lib/fixposition_driver.hpp>
 #include <fixposition_driver_lib/helper.hpp>
+#include <fpsdk_common/cam.hpp>
 #include <fpsdk_common/parser/fpa.hpp>
 #include <fpsdk_common/parser/novb.hpp>
+#include <fpsdk_common/video.hpp>
 
 #include "fixposition_driver_ros2/ext/rclcpp.hpp"
 
@@ -107,6 +109,29 @@ void PublishJumpWarning(const JumpDetector& jump_detector, rclcpp::Publisher<fpm
 void PublishDatum(const geometry_msgs::msg::Vector3& payload, const builtin_interfaces::msg::Time& stamp,
                   rclcpp::Publisher<sensor_msgs::msg::NavSatFix>::SharedPtr& pub);
 void PublishFusionEpochData(const FusionEpochData& data, rclcpp::Publisher<fpmsgs::FusionEpoch>::SharedPtr& pub);
+
+/**
+ * @brief Publish an encoded camera frame (H.264/H.265) as CamFrame
+ *
+ * @param[in]  data      The frame from the camera stream
+ * @param[in]  frame_id  Frame ID for the message header
+ * @param[in]  pub       The publisher
+ */
+void PublishCamFrame(const fpsdk::common::cam::CamData& data, const std::string& frame_id,
+                     const rclcpp::Publisher<fpmsgs::CamFrame>::SharedPtr& pub);
+
+#if FPSDK_USE_FFMPEG
+/**
+ * @brief Publish a decoded camera image as sensor_msgs/Image (rgb8 or mono8)
+ *
+ * @param[in]  data      The frame from the camera stream (for the meta data)
+ * @param[in]  img       The decoded image (RGB24 or Y8)
+ * @param[in]  frame_id  Frame ID for the message header
+ * @param[in]  pub       The publisher
+ */
+void PublishCamImage(const fpsdk::common::cam::CamData& data, const fpsdk::common::video::ImageData& img,
+                     const std::string& frame_id, const rclcpp::Publisher<sensor_msgs::msg::Image>::SharedPtr& pub);
+#endif
 
 /* ****************************************************************************************************************** */
 }  // namespace fixposition
