@@ -2,8 +2,8 @@
 """Mock PBx-A1 camera streaming endpoint, for testing without a sensor.
 
 Serves GET /api/v2/camera/data?cam=CAMx&data=HIRES_VID&rate=1 as a never-ending multipart/x-mixed-replace
-stream (chunked), in the format documented in "Eagle Camera Streaming - FAE Information" (X-Fp-Meta with
-ts/dt in integer ns, version 2.147+). The frames come from a raw H.265/H.264 Annex-B file, which is split into
+stream (chunked), in the format that fpsdk::common::cam::CamStream parses (X-Fp-Meta with ts/dt in integer ns,
+firmware 2.147+). The frames come from a raw H.265/H.264 Annex-B file, which is split into
 access units (one part per picture, VPS/SPS/PPS are kept together with the IDR picture, like the sensor does).
 
 CamStream hardcodes port 80 (no host:port support), so this needs to run as root on port 80, or use --port with a
