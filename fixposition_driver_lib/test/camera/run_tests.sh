@@ -25,5 +25,6 @@ run "B start mid-GOP (P frames first)" 3 --start-at-p
 run "C connection dropped every 30 frames" 6 --drop-after 30
 run "D sequence counter jump (no frame lost)" 3 --skip-seq 10
 run "E one frame lost"               3 --lose-after 20
+run "F stalled connection (open but silent), watchdog 1 s, stop while stalled" 5 --stall-after 50 --stall-secs 60
 # Replay of a real recording: fpltool extract -e jsonl some.fpl; then  mock_sensor.py --jsonl some.jsonl --cam CAM1
 echo "(FFmpeg decode: $FF)  workdir: $W"

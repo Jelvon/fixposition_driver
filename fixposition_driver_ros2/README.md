@@ -40,7 +40,7 @@ clock of the computer running the driver. `CamFrame.keyframe` marks I-frames: a 
   handles (FP_A, NMEA, NOV_B). It is a separate HTTP client of the sensor, so this is not a new parser but a new
   component next to `FixpositionDriver`.
 - **`CameraStreamer`** (`fixposition_driver_lib`, no ROS dependency) handles one camera: one thread, one connection
-  (`fpsdk::common::cam::CamStream`), reconnect with `reconnect_delay`, observers for frames and decoded images. Like
+  (`fpsdk::common::cam::CamStream`), reconnect with `reconnect_delay` (a watchdog closes a connection that stays open but silent for 3 s), observers for frames and decoded images. Like
   the rest of the lib it only hands out data; `fixposition_driver_ros2` turns it into messages.
 - **Start at an I-frame.** After every (re-)connect all frames before the first I-frame are dropped, so downstream
   decoders never see a stream that starts mid-GOP.
@@ -64,4 +64,4 @@ clock of the computer running the driver. `CamFrame.keyframe` marks I-frames: a 
 
 `CameraStreamer` can be tested without a sensor against a small mock of the sensor's camera endpoint
 (a raw H.264/H.265 file, or the camera data of a `.fpl` recording extracted with `fpltool extract -e jsonl`).
-The tests check: normal streaming, join in the middle of a GOP, reconnect, lost frames, `seq` jumps, decoding, and stop latency.
+The tests check: normal streaming, join in the middle of a GOP, reconnect, a stalled (open but silent) connection, lost frames, `seq` jumps, decoding, and stop latency.

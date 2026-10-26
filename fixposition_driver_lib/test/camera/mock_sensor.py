@@ -133,6 +133,10 @@ def serve_client(conn, aus, args, width, height):
             if args.drop_after and sent >= args.drop_after:
                 print("dropping connection after %d frames" % sent, flush=True)
                 return
+            if args.stall_after and sent >= args.stall_after:
+                print("stalling after %d frames (connection stays open)" % sent, flush=True)
+                time.sleep(args.stall_secs)
+                return
             # 25 Hz
             nxt = t0 + sent / 25.0
             time.sleep(max(0.0, nxt - time.time()))
@@ -225,6 +229,8 @@ def main():
     ap.add_argument("--drop-after", type=int, default=0, help="close connection after N frames (every client)")
     ap.add_argument("--start-at-p", action="store_true", help="first frame sent is a P frame")
     ap.add_argument("--skip-seq", type=int, default=0, help="introduce a seq gap (but no missing frame) after N frames")
+    ap.add_argument("--stall-after", type=int, default=0, help="stop sending after N frames but keep the connection open")
+    ap.add_argument("--stall-secs", type=float, default=3600.0)
     ap.add_argument("--lose-after", type=int, default=0, help="really lose one frame after N frames (seq and time jump)")
     args = ap.parse_args()
 

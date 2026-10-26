@@ -47,7 +47,8 @@ struct CameraParams {
     //! Which stream. Only the video streams (HIRES_VID, LORES_VID) are supported by this class.
     fpsdk::common::cam::CamDataType data_type_ = fpsdk::common::cam::CamDataType::HIRES_VID;
     double reconnect_delay_ = 5.0;  //!< Wait time [s] before reconnecting after the connection was lost
-    double timeout_ = 1.0;     //!< Timeout [s] for receiving data, must be >= 0.1. Also limits StopStreamer() latency
+    double timeout_ =
+        3.0;  //!< Timeout [s]: close the connection (and reconnect) if there is no data for this long, >= 0.1
     bool wait_iframe_ = true;  //!< Drop all frames until the first I-frame (after each (re-)connect)
 
     // Decoding (only effective if the Fixposition SDK was built with FFmpeg, see FPSDK_USE_FFMPEG)
@@ -122,7 +123,7 @@ class CameraStreamer : private boost::noncopyable {
     bool StartStreamer();
 
     /**
-     * @brief Stop the streamer thread (blocks for up to CameraParams::timeout_)
+     * @brief Stop the streamer thread (returns within about 100 ms, also if the connection is stalled)
      */
     void StopStreamer();
 
@@ -141,8 +142,9 @@ class CameraStreamer : private boost::noncopyable {
     std::vector<ImageObserver> image_observers_;
 #endif
 
-    bool Worker();                                       //!< Thread function: connect, stream, reconnect
-    void Stream(fpsdk::common::cam::CamStream& stream);  //!< Receive frames until the connection is lost
+    bool Worker();  //!< Thread function: connect, stream, reconnect
+    bool Stream(
+        fpsdk::common::cam::CamStream& stream);  //!< Receive frames until the connection is lost (true: already closed)
 };
 
 /* ****************************************************************************************************************** */

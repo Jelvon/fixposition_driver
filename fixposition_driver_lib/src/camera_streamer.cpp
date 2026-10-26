@@ -12,7 +12,10 @@
  */
 
 /* LIBC/STL */
+#include <atomic>
+#include <chrono>
 #include <cinttypes>
+#include <thread>
 
 /* EXTERNAL */
 #include <fpsdk_common/logging.hpp>
@@ -90,8 +93,9 @@ bool CameraStreamer::Worker() {
         if (stream->Connect()) {
             stats_.n_connect_++;
             INFO("CameraStreamer(%s) connected", params_.name_.c_str());
-            Stream(*stream);
-            stream->Disconnect();
+            if (!Stream(*stream)) {
+                stream->Disconnect();
+            }
         }
 
         if (worker_.ShouldAbort()) {
@@ -110,7 +114,30 @@ bool CameraStreamer::Worker() {
 
 // ---------------------------------------------------------------------------------------------------------------------
 
-void CameraStreamer::Stream(CamStream& stream) {
+bool CameraStreamer::Stream(CamStream& stream) {
+    // The read timeout of CamStream does not work (the SDK reads synchronously), so a stalled connection (e.g. cable
+    // unplugged, sensor frozen) would block NextFrame() forever, and so StopStreamer(). A watchdog thread closes the
+    // connection (which unblocks NextFrame()) if there is no data for a while, or if the streamer is to be stopped.
+    using Clock = std::chrono::steady_clock;
+    std::atomic<int64_t> last_data{Clock::now().time_since_epoch().count()};
+    std::atomic<bool> finished{false};
+    std::atomic<bool> stalled{false};
+    bool disconnected = false;
+    const auto stall_timeout =
+        std::chrono::duration_cast<Clock::duration>(std::chrono::duration<double>(params_.timeout_));
+    std::thread watchdog([&]() {
+        while (!finished) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(50));
+            const auto idle = Clock::now() - Clock::time_point(Clock::duration(last_data.load()));
+            if (!finished && (worker_.ShouldAbort() || (idle > stall_timeout))) {
+                stalled = !worker_.ShouldAbort();
+                stream.Disconnect();
+                disconnected = true;
+                return;
+            }
+        }
+    });
+
     bool seen_iframe = !params_.wait_iframe_;
     bool have_seq = false;
     uint64_t last_seq = 0;
@@ -125,8 +152,9 @@ void CameraStreamer::Stream(CamStream& stream) {
         // Fresh object for each frame: CamStream::NextFrame() only overwrites the fields it finds in the meta data,
         // anything else (e.g. valid_, frm_) would be left over from the previous frame.
         CamData data;
+        last_data = Clock::now().time_since_epoch().count();  // the watchdog measures the time in NextFrame()
         if (!stream.NextFrame(data)) {
-            break;  // lost connection, bad data, timeout
+            break;  // lost connection, bad data, stalled (closed by the watchdog)
         }
 
         // Not a (known) video frame
@@ -207,6 +235,14 @@ void CameraStreamer::Stream(CamStream& stream) {
         }
 #endif
     }
+
+    finished = true;
+    watchdog.join();
+    if (stalled) {
+        WARNING("CameraStreamer(%s) no data for %.1f seconds, closing connection", params_.name_.c_str(),
+                params_.timeout_);
+    }
+    return disconnected;
 }
 
 /* ****************************************************************************************************************** */
